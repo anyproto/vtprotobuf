@@ -128,7 +128,7 @@ func genService(gen *protogen.Plugin, file *protogen.File, g *generator.Generate
 			g.P(deprecationComment)
 		}
 		g.P(method.Comments.Leading,
-			serverSignature(g, method))
+			serverSignature(g, method, false))
 	}
 	if *requireUnimplemented {
 		g.P("mustEmbedUnimplemented", serverType, "()")
@@ -142,12 +142,8 @@ func genService(gen *protogen.Plugin, file *protogen.File, g *generator.Generate
 	g.P("}")
 	g.P()
 	for _, method := range service.Methods {
-		nilArg := ""
-		if !method.Desc.IsStreamingClient() && !method.Desc.IsStreamingServer() {
-			nilArg = "nil,"
-		}
-		g.P("func (Unimplemented", serverType, ") ", serverSignature(g, method), "{")
-		g.P("return ", nilArg, statusPackage.Ident("Errorf"), "(", codesPackage.Ident("Unimplemented"), `, "method `, method.GoName, ` not implemented")`)
+		g.P("func (Unimplemented", serverType, ") ", serverSignature(g, method, true), "{")
+		g.P("return nil")
 		g.P("}")
 	}
 	if *requireUnimplemented {
@@ -317,12 +313,17 @@ func genClientMethod(gen *protogen.Plugin, file *protogen.File, g *generator.Gen
 	}
 }
 
-func serverSignature(g *generator.GeneratedFile, method *protogen.Method) string {
+func serverSignature(g *generator.GeneratedFile, method *protogen.Method, isUnimplemented bool) string {
 	var reqArgs []string
-	ret := "error"
+	var ret string
+	if isUnimplemented {
+		ret = "error"
+	}
 	if !method.Desc.IsStreamingClient() && !method.Desc.IsStreamingServer() {
 		reqArgs = append(reqArgs, g.QualifiedGoIdent(contextPackage.Ident("Context")))
-		ret = "(*" + g.QualifiedGoIdent(method.Output.GoIdent) + ", error)"
+		if !isUnimplemented {
+			ret = "*" + g.QualifiedGoIdent(method.Output.GoIdent) + ""
+		}
 	}
 	if !method.Desc.IsStreamingClient() {
 		reqArgs = append(reqArgs, "*"+g.QualifiedGoIdent(method.Input.GoIdent))
@@ -342,13 +343,13 @@ func genServerMethod(gen *protogen.Plugin, file *protogen.File, g *generator.Gen
 		// g.P("in := new(", method.Input.GoIdent, ")")
 		g.Alloc("in", method.Input, true)
 		g.P("if err := dec(in); err != nil { return nil, err }")
-		g.P("if interceptor == nil { return srv.(", service.GoName, "Server).", method.GoName, "(ctx, in) }")
+		g.P("if interceptor == nil { return srv.(", service.GoName, "Server).", method.GoName, "(ctx, in), nil }")
 		g.P("info := &", grpcPackage.Ident("UnaryServerInfo"), "{")
 		g.P("Server: srv,")
 		g.P("FullMethod: ", strconv.Quote(fmt.Sprintf("/%s/%s", service.Desc.FullName(), method.Desc.Name())), ",")
 		g.P("}")
 		g.P("handler := func(ctx ", contextPackage.Ident("Context"), ", req interface{}) (interface{}, error) {")
-		g.P("return srv.(", service.GoName, "Server).", method.GoName, "(ctx, req.(*", method.Input.GoIdent, "))")
+		g.P("return srv.(", service.GoName, "Server).", method.GoName, "(ctx, req.(*", method.Input.GoIdent, ")), nil")
 		g.P("}")
 		g.P("return interceptor(ctx, in, info, handler)")
 		g.P("}")
@@ -361,10 +362,11 @@ func genServerMethod(gen *protogen.Plugin, file *protogen.File, g *generator.Gen
 		// g.P("m := new(", method.Input.GoIdent, ")")
 		g.Alloc("m", method.Input, true)
 		g.P("if err := stream.RecvMsg(m); err != nil { return err }")
-		g.P("return srv.(", service.GoName, "Server).", method.GoName, "(m, &", streamType, "{stream})")
+		g.P("srv.(", service.GoName, "Server).", method.GoName, "(m, &", streamType, "{stream})")
 	} else {
-		g.P("return srv.(", service.GoName, "Server).", method.GoName, "(&", streamType, "{stream})")
+		g.P("srv.(", service.GoName, "Server).", method.GoName, "(&", streamType, "{stream})")
 	}
+	g.P("return nil")
 	g.P("}")
 	g.P()
 

@@ -11,20 +11,20 @@ import (
 
 const version = "1.1.0-vtproto"
 
-var requireUnimplementedAlways = false
+var requireUnimplementedAlways = true
 var requireUnimplemented = &requireUnimplementedAlways
 
 func init() {
-	generator.RegisterFeature("grpc", func(gen *generator.GeneratedFile) generator.FeatureGenerator {
-		return &grpc{gen}
+	generator.RegisterFeature("gomobile", func(gen *generator.GeneratedFile) generator.FeatureGenerator {
+		return &gomobile{gen}
 	})
 }
 
-type grpc struct {
+type gomobile struct {
 	*generator.GeneratedFile
 }
 
-func (g *grpc) GenerateFile(file *protogen.File) bool {
+func (g *gomobile) GenerateFile(file *protogen.File) bool {
 	if len(file.Services) == 0 {
 		return false
 	}

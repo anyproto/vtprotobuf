@@ -6,6 +6,7 @@
 package clone
 
 import (
+	"fmt"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
@@ -48,10 +49,14 @@ func (p *clone) GenerateFile(file *protogen.File) bool {
 	return p.once
 }
 
+func opaqueOneofInterfaceName(oneof *protogen.Oneof) string {
+	return fmt.Sprintf("Is%s%s", oneof.Parent.GoIdent.GoName, oneof.GoName)
+}
+
 // cloneOneofField generates the statements for cloning a oneof field
 func (p *clone) cloneOneofField(lhsBase, rhsBase string, oneof *protogen.Oneof) {
 	fieldname := oneof.GoName
-	ccInterfaceName := "is" + oneof.GoIdent.GoName
+	ccInterfaceName := opaqueOneofInterfaceName(oneof)
 	lhs := lhsBase + "." + fieldname
 	rhs := rhsBase + "." + fieldname
 	p.P(`if `, rhs, ` != nil {`)
@@ -271,7 +276,7 @@ func (p *clone) bodyForOneOf(ccTypeName string, field *protogen.Field) {
 // field in a oneof.
 func (p *clone) generateCloneMethodsForOneof(message *protogen.Message, field *protogen.Field) {
 	ccTypeName := field.GoIdent.GoName
-	ccInterfaceName := "is" + field.Oneof.GoIdent.GoName
+	ccInterfaceName := opaqueOneofInterfaceName(field.Oneof)
 	if p.IsWellKnownType(message) {
 		p.P(`func (m *`, ccTypeName, `) `, cloneName, `() *`, ccTypeName, ` {`)
 	} else {

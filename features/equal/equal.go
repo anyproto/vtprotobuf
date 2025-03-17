@@ -86,7 +86,7 @@ func (p *equal) message(proto3 bool, message *protogen.Message) {
 			p.P(`	if that.`, fieldname, ` == nil {`)
 			p.P(`		return false`)
 			p.P(`	}`)
-			ccInterfaceName := fmt.Sprintf("is%s", field.Oneof.GoIdent.GoName)
+			ccInterfaceName := opaqueOneofInterfaceName(field.Oneof)
 			if p.IsWellKnownType(message) {
 				p.P(`switch c := this.`, fieldname, `.(type) {`)
 				for _, f := range field.Oneof.Fields {
@@ -140,9 +140,13 @@ func (p *equal) message(proto3 bool, message *protogen.Message) {
 	}
 }
 
+func opaqueOneofInterfaceName(oneof *protogen.Oneof) string {
+	return fmt.Sprintf("Is%s%s", oneof.Parent.GoIdent.GoName, oneof.GoName)
+}
+
 func (p *equal) oneof(field *protogen.Field) {
 	ccTypeName := field.GoIdent.GoName
-	ccInterfaceName := fmt.Sprintf("is%s", field.Oneof.GoIdent.GoName)
+	ccInterfaceName := opaqueOneofInterfaceName(field.Oneof)
 	fieldname := field.GoName
 
 	if p.IsWellKnownType(field.Parent) {
